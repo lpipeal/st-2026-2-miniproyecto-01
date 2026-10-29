@@ -29,9 +29,9 @@ entrega pierde el 20 %; quien no aparezca aquí no cuenta como parte del grupo.
 
 | Nombre completo | Código | Correo institucional |
 |---|---|---|
-| | | |
-| | | |
-| | | |
+|LUIS FELIPE ALVAREZ |22602104  |luis_felipe.alvarez@auo.edu.co
+|NATALI CHARRUPI RIASCOS |22600606|natali.charrupi@uao.edu.co
+|JULIAN PAYAN POTES | 22601460 |julian.payan@uao.edu.co
 
 ## Entrega
 
