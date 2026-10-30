@@ -9,14 +9,22 @@ partes marcadas con TODO las completa el grupo; mientras falten, el guion las
 reporta como pendientes y sigue. El informe, docs/informe.md, cita las cifras
 y las figuras que produce este guion.
 """
+import itertools
 import warnings
 
 import matplotlib
 
 matplotlib.use("Agg")
+import holidays  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+import matplotlib.dates as mdates
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.seasonal import STL
+
 
 from comun import (RAIZ, backtest, cargar_serie, estacional_ingenuo,  # noqa: E402
                    fechas_siguientes, ingenuo)
@@ -33,15 +41,19 @@ RESULTADOS.mkdir(exist_ok=True)
 # Cambie estos cuatro datos por los de la serie del grupo y documente la
 # fuente en datos/README.md. La serie de ejemplo solo sirve para probar que
 # el guion corre.
-ARCHIVO = "datos/air_passengers.csv"
-FECHA = "Month"
-VALOR = "#Passengers"
+ARCHIVO = "datos/trafico_vehicular_peaje_siberia.csv"
+FECHA = "mes"
+VALOR = "total"
 PERIODO = 12
+PAIS = "CO"
+ESCALA = 10_000
 
 # Lo que se hizo con los huecos y con los datos atípicos, en una línea. Va
 # a la columna `decision` de la tabla de métricas.
-DECISION = "TODO: describa aquí la decisión sobre huecos y datos atípicos"
-
+DECISION = (
+    "Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. "
+    "Se conservaron los valores originales, sin corrección automática."
+)
 
 def preparar(serie):
     """TODO: aplique la decisión del grupo sobre huecos y datos atípicos.
