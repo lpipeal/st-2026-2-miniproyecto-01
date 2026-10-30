@@ -84,10 +84,14 @@ grupo; mientras falten, el guion las reporta como pendientes y sigue.
 
 ## Cómo se corre
 ```bash
+# Crear el entorno virutal
 python -m venv venv
 
-# Activar entorno
+# Activar entorno linux o mac
 source venv/bin/activate
+
+# Activar entorno windows
+source venv/Scripts/activate
 
 # Desactivar entorno
 source venv/bin/deactivate
