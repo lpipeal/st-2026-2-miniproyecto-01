@@ -83,9 +83,19 @@ corre desde el primer día. Las partes marcadas con `TODO` las completa el
 grupo; mientras falten, el guion las reporta como pendientes y sigue.
 
 ## Cómo se corre
-
 ```bash
+python -m venv venv
+
+# Activar entorno
+source venv/bin/activate
+
+# Desactivar entorno
+source venv/bin/deactivate
+
+# Instalar librerias 
 pip install -r requirements.txt
+
+# Correr miniproyecto
 python miniproyecto.py
 ```
 
