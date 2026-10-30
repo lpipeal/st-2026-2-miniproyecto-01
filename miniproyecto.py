@@ -61,14 +61,35 @@ def preparar(serie):
     Por ejemplo, interpolar los meses vacíos o recortar el tramo afectado.
     Debe devolver una serie sin NaN.
     """
+    if serie.empty:
+        raise ValueError("La serie está vacía.")
+    if serie.isna().any():
+        raise ValueError(
+            "La serie tiene meses faltantes. Revise los datos y documente "
+            "cómo tratarlos antes de continuar."
+        )
+
+    q1, q3 = serie.quantile([0.25, 0.75])
+    iqr = q3 - q1
+    limite_inferior = q1 - 1.5 * iqr
+    limite_superior = q3 + 1.5 * iqr
+    atipicos = serie[(serie < limite_inferior) | (serie > limite_superior)]
+    print(
+        f"Atípicos según 1,5 × IQR: {len(atipicos)}; "
+        "se conservan los valores originales."
+    )
     return serie
 
 
 def graficar_serie(serie):
     figura, eje = plt.subplots(figsize=(9, 3.4))
     eje.plot(serie.index, serie.to_numpy())
-    eje.set_title(f"{VALOR}: serie mensual")
-    eje.set_ylabel(VALOR)
+    eje.set_title("Camiones por mes/año")
+    eje.set_ylabel("Número de Camiones")
+    eje.set_xlabel("Mes/Año")
+    eje.xaxis.set_major_locator(mdates.MonthLocator(interval=12))
+    eje.xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
+    eje.tick_params(axis='x', rotation=45)
     figura.tight_layout()
     figura.savefig(FIGURAS / "serie.png", dpi=120)
     plt.close(figura)

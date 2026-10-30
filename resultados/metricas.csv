@@ -1,0 +1,3 @@
+modelo,decision,RMSE,MAE,MAPE
+estacional ingenuo,"Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. Se conservaron los valores originales, sin corrección automática.",6833.25,5770.06,5.56
+ingenuo,"Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. Se conservaron los valores originales, sin corrección automática.",7379.41,6353.49,6.12
