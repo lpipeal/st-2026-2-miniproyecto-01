@@ -265,9 +265,19 @@ def modelo_sarimax(orden, orden_estacional, x):
     Use x.loc[entrenamiento.index] para ajustar y
     x.loc[fechas_siguientes(entrenamiento, h)] para pronosticar.
     """
-    raise NotImplementedError("SARIMAX en el backtest")
+    def pronosticar(entrenamiento, h):
+        fechas_futuras = fechas_siguientes(entrenamiento, h)
+        exog_entrenamiento = x.loc[entrenamiento.index]
+        exog_futuras = x.loc[fechas_futuras]
+        ajuste = ARIMA(
+            entrenamiento / ESCALA,
+            order=orden,
+            seasonal_order=orden_estacional,
+            exog=exog_entrenamiento,
+        ).fit()
+        return ajuste.forecast(steps=h, exog=exog_futuras).to_numpy() * ESCALA
 
-
+    return pronosticar
 # ============================================================
 # 5. La tabla de métricas
 # ============================================================
