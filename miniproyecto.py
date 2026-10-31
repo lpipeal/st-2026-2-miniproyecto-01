@@ -101,7 +101,12 @@ def graficar_serie(serie):
 
 def descomponer(serie):
     """TODO: STL robusta con el periodo de la serie; guarde figuras/stl.png."""
-    raise NotImplementedError("descomposición STL")
+    with plt.rc_context({"figure.figsize": (8, 3.4), "font.size": 11}):
+        resultado = STL(serie, period=PERIODO, robust=True).fit()
+        figura = resultado.plot()
+        figura.savefig(FIGURAS / "stl.png", dpi=120)
+    plt.close(figura)
+
 
 
 # ============================================================
