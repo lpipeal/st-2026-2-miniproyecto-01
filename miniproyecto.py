@@ -154,12 +154,85 @@ def elegir_sarima(serie, d, D):
     residuos del elegido con Ljung-Box y guarde figuras/residuos.png.
     Devuelva el orden y el orden estacional elegidos.
     """
-    raise NotImplementedError("selección del SARIMA")
+    escalada = serie / ESCALA
+
+    resultados = []
+    fallos = []
+    for p, q, P, Q in itertools.product([0, 1], repeat=4):
+        orden = (p, d, q)
+        orden_estacional = (P, D, Q, PERIODO)
+        try:
+            ajuste = ARIMA(
+                escalada,
+                order=orden,
+                seasonal_order=orden_estacional,
+            ).fit()
+        except (ValueError, np.linalg.LinAlgError) as error:
+            fallos.append((orden, orden_estacional, error))
+            continue
+        resultados.append({
+            "order": orden,
+            "seasonal_order": orden_estacional,
+            "AIC": ajuste.aic,
+            "converged": ajuste.mle_retvals.get("converged", True),
+            "fit": ajuste,
+        })
+
+    if not resultados:
+        raise RuntimeError("No se pudo ajustar ningún modelo de la rejilla SARIMA.")
+
+    rejilla = pd.DataFrame([
+        {clave: valor for clave, valor in resultado.items() if clave != "fit"}
+        for resultado in resultados
+    ]).sort_values("AIC")
+    print(f"Rejilla SARIMA sobre serie / {ESCALA:g}, con d={d} y D={D}:")
+    print(rejilla.to_string(index=False, float_format=lambda valor: f"{valor:.2f}"))
+    if fallos:
+        print(f"Modelos que no se pudieron ajustar: {len(fallos)}")
+        for orden, orden_estacional, error in fallos:
+            print(f"  {orden} x {orden_estacional}: {type(error).__name__}: {error}")
+    
+    candidatos = [
+        resultado for resultado in resultados
+        if resultado["converged"] and np.isfinite(resultado["AIC"])
+    ]
+    if not candidatos:
+        raise RuntimeError("Ningún modelo SARIMA convergió con AIC finito.")
+
+    mejor = min(candidatos, key=lambda resultado: resultado["AIC"])
+    orden = mejor["order"]
+    orden_estacional = mejor["seasonal_order"]
+    ajuste = mejor["fit"]
+    residuos = ajuste.resid.iloc[d + PERIODO * D:]
+    lags_ljung_box = [lag for lag in (12, 24) if lag < len(residuos)]
+    if not lags_ljung_box:
+        raise ValueError("Se necesitan al menos 13 residuos para aplicar Ljung-Box.")
+
+    print(f"\nModelo elegido: {orden} x {orden_estacional}")
+    print(ajuste.summary())
+    print("\nPrueba de Ljung-Box sobre los residuos:")
+    print(acorr_ljungbox(residuos, lags=lags_ljung_box, return_df=True))
+
+    lags_grafica = min(24, len(residuos) // 2)
+    figura = ajuste.plot_diagnostics(lags=lags_grafica, figsize=(10, 8))
+    figura.tight_layout()
+    figura.savefig(FIGURAS / "residuos.png", dpi=120)
+    plt.close(figura)
+    return orden, orden_estacional
+
 
 
 def modelo_sarima(orden, orden_estacional):
     """TODO: devuelva la función modelo(entrenamiento, h) del SARIMA elegido."""
-    raise NotImplementedError("SARIMA en el backtest")
+    def pronosticar(entrenamiento, h):
+        ajuste = ARIMA(
+            entrenamiento / ESCALA,
+            order=orden,
+            seasonal_order=orden_estacional,
+        ).fit()
+        return ajuste.forecast(steps=h).to_numpy() * ESCALA
+
+    return pronosticar
 
 
 def exogenas(serie):
