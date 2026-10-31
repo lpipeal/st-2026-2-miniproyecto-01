@@ -257,11 +257,10 @@ def estacionariedad(serie):
 # pronósticos y solo usa `entrenamiento`. Así entra al backtest común.
 
 def elegir_sarima(serie, d, D):
-    """TODO: rejilla pequeña de órdenes (p, q, P, Q) comparada por AIC.
+    """Selecciona una rejilla SARIMA por AIC y diagnostica sus residuos.
 
-    Ajuste con toda la serie preparada, imprima la tabla de AIC, revise los
-    residuos del elegido con Ljung-Box y guarde figuras/residuos.png.
-    Devuelva el orden y el orden estacional elegidos.
+    Ajusta con toda la serie preparada y corrige Ljung-Box por p+q+P+Q.
+    Guarda figuras/residuos.png y devuelve los órdenes elegidos.
     """
     escalada = serie / ESCALA
 
@@ -313,14 +312,37 @@ def elegir_sarima(serie, d, D):
     orden_estacional = mejor["seasonal_order"]
     ajuste = mejor["fit"]
     residuos = ajuste.resid.iloc[d + PERIODO * D:]
-    lags_ljung_box = [lag for lag in (12, 24) if lag < len(residuos)]
+    grados_modelo = orden[0] + orden[2] + orden_estacional[0] + orden_estacional[2]
+    lags_ljung_box = [
+        lag for lag in (12, 24) if grados_modelo < lag < len(residuos)
+    ]
     if not lags_ljung_box:
-        raise ValueError("Se necesitan al menos 13 residuos para aplicar Ljung-Box.")
+        raise ValueError(
+            "No hay rezagos válidos para Ljung-Box: deben superar los grados "
+            "de libertad del modelo y ser menores que el número de residuos."
+        )
 
     print(f"\nModelo elegido: {orden} x {orden_estacional}")
     print(ajuste.summary())
-    print("\nPrueba de Ljung-Box sobre los residuos:")
-    print(acorr_ljungbox(residuos, lags=lags_ljung_box, return_df=True))
+    alfa = 0.05
+    diagnostico = acorr_ljungbox(
+        residuos, lags=lags_ljung_box, model_df=grados_modelo, return_df=True
+    )
+    diagnostico.insert(0, "gl", diagnostico.index - grados_modelo)
+    diagnostico["rechaza_H0"] = np.where(diagnostico["lb_pvalue"] < alfa, "sí", "no")
+    print(
+        f"\nLjung-Box: {len(residuos)} residuos; "
+        f"model_df=p+q+P+Q={grados_modelo}; gl=rezago-model_df."
+    )
+    print(f"H0: sin autocorrelación hasta el rezago evaluado; alfa={alfa}.")
+    print(diagnostico.to_string(float_format=lambda valor: f"{valor:.6f}"))
+    if (diagnostico["lb_pvalue"] < alfa).any():
+        print(
+            "Se rechaza H0 en al menos un rezago: persiste autocorrelación "
+            "residual. El mínimo AIC de la rejilla no garantiza ruido blanco."
+        )
+    else:
+        print("No se rechaza H0 en los rezagos evaluados al 5 %.")
 
     lags_grafica = min(24, len(residuos) // 2)
     figura = ajuste.plot_diagnostics(lags=lags_grafica, figsize=(10, 8))

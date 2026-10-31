@@ -191,13 +191,109 @@ automática del modelo.
 
 ## 5. Modelos clásicos
 
-{{La rejilla de órdenes y su AIC. El modelo elegido, escrito con su
-ecuación.}}
+Se evaluaron las 16 combinaciones de $p,q,P,Q\in\{0,1\}$, manteniendo
+$d=1$, $D=0$ y periodo 12. Todos los ajustes usaron las mismas 149
+observaciones de la serie preparada, dividida por 10.000. La selección
+se hizo por el menor AIC entre los modelos que convergieron y tuvieron
+AIC finito; en esta ejecución convergieron los 16 candidatos.
+
+| Orden $(p,d,q)$ | Orden estacional $(P,D,Q,12)$ | AIC |
+|---|---|---:|
+| (0,1,1) | (1,0,1,12) | 160,67 |
+| (1,1,1) | (1,0,1,12) | 161,04 |
+| (0,1,1) | (1,0,0,12) | 174,58 |
+| (1,1,1) | (1,0,0,12) | 175,44 |
+| (1,1,0) | (1,0,1,12) | 177,20 |
+| (1,1,0) | (1,0,0,12) | 183,42 |
+| (0,1,1) | (0,0,1,12) | 183,78 |
+| (1,1,1) | (0,0,1,12) | 184,42 |
+| (1,1,0) | (0,0,0,12) | 189,82 |
+| (1,1,1) | (0,0,0,12) | 203,55 |
+| (0,1,1) | (0,0,0,12) | 203,61 |
+| (1,1,0) | (0,0,0,12) | 208,00 |
+| (0,1,0) | (1,0,1,12) | 217,69 |
+| (0,1,0) | (1,0,0,12) | 224,64 |
+| (0,1,0) | (0,0,1,12) | 233,01 |
+| (0,1,0) | (0,0,0,12) | 253,01 |
+
+El modelo elegido fue **SARIMA$(0,1,1)(1,0,1)_{12}$**, con AIC de
+160,6682. El siguiente candidato obtuvo 161,04: la diferencia de unos
+0,37 puntos es pequeña, por lo que también es un candidato cercano.
+Estos AIC corresponden a una muestra y escala comunes; no se mezclan con
+AIC calculados sobre otras transformaciones.
+
+Definiendo $z_t=y_t/10\,000$ y el operador de rezago $Bz_t=z_{t-1}$, la
+ecuación del modelo elegido es:
+
+$$
+(1-\Phi_1B^{12})(1-B)z_t
+=(1+\theta_1B)(1+\Theta_1B^{12})\varepsilon_t.
+$$
+
+Las estimaciones fueron $\theta_1=-0{,}6356$,
+$\Phi_1=0{,}9994$ y $\Theta_1=-0{,}9727$, de modo que:
+
+$$
+(1-0{,}9994B^{12})(1-B)z_t
+=(1-0{,}6356B)(1-0{,}9727B^{12})\varepsilon_t.
+$$
+
+No se incluyó deriva, según la configuración usada al ajustar el modelo
+integrado. La varianza estimada de las innovaciones fue
+$\hat\sigma^2=0{,}1403$ en la escala de $z_t$. La forma multiplicativa y
+la convención de signos corresponden a la
+[especificación ARIMA de statsmodels](https://www.statsmodels.org/stable/generated/statsmodels.tsa.arima.model.ARIMA.html).
+
 
 ![Residuos](../figuras/residuos.png)
 
-{{Diagnóstico de los residuos: Ljung-Box y lo que muestran la gráfica y su
-ACF.}}
+Para Ljung–Box se utilizaron 148 residuos, después de descartar el primer
+residuo de inicialización asociado a la diferencia regular. Se corrigieron
+los grados de libertad por los términos AR y MA estimados, tanto regulares
+como estacionales:
+
+$$
+k_{\mathrm{LB}}=p+q+P+Q=0+1+1+1=3, \qquad
+\nu=h-k_{\mathrm{LB}}.
+$$
+
+Se pasó `model_df=3` a `acorr_ljungbox`. Los órdenes de diferenciación y
+la varianza de las innovaciones no se cuentan en esta corrección por
+términos AR/MA. Cada rezago debe superar `model_df` para que el contraste
+tenga grados de libertad positivos, como explica la
+[documentación de Ljung–Box](https://www.statsmodels.org/stable/generated/statsmodels.stats.diagnostic.acorr_ljungbox.html).
+La hipótesis nula es que no hay autocorrelación en el conjunto de rezagos
+del 1 al $h$ evaluado; se usó un nivel de significancia del 5 %.
+
+| Rezago $h$ | Grados de libertad $\nu$ | Estadístico Ljung–Box | Valor p corregido | Rechaza $H_0$ al 5 % |
+|---:|---:|---:|---:|---|
+| 12 | 9 | 19,657525 | 0,020148 | Sí |
+| 24 | 21 | 30,778844 | 0,077418 | No |
+
+**Se detecta autocorrelación residual en el contraste hasta el rezago 12.**
+Este es un contraste conjunto: no identifica por sí solo al rezago 12
+como el responsable. No rechazar en el rezago 24 no elimina el rechazo
+obtenido al evaluar los primeros 12. Por tanto, el diagnóstico no respalda
+concluir que los residuos sean ruido blanco. La versión anterior omitía
+`model_df` y daba valores p de 0,073848 y 0,160262, lo que cambiaba la
+interpretación del primer contraste.
+
+La figura muestra los residuos estandarizados, su histograma, el gráfico
+Q–Q y su ACF, según la función
+[`plot_diagnostics`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.arima.model.ARIMAResults.plot_diagnostics.html).
+La serie residual oscila alrededor de cero, pero presenta una desviación
+negativa marcada en 2020 y picos positivos alrededor de 2021. El centro
+del histograma se aproxima a la referencia normal, mientras que las
+colas del gráfico Q–Q se apartan de la recta; la curtosis de 4,65 que
+imprime el ajuste también señala colas más pesadas que la normal.
+En la ACF residual quedan algunos picos fuera de las bandas, coherentes
+con que el modelo no haya capturado toda la dependencia temporal.
+
+Se conserva este modelo como el mínimo AIC de la rejilla para comparar
+su desempeño predictivo, dejando explícita su limitación diagnóstica.
+La elección inicial de $d=1$, $D=0$ y la rejilla pequeña pueden revisarse
+en una ampliación del experimento; un menor AIC no garantiza residuos
+sin autocorrelación.
 
 {{La variable exógena: qué es, por qué se conoce de antemano y si mejora al
 SARIMA.}}
