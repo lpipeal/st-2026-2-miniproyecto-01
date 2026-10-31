@@ -114,7 +114,26 @@ def estacionariedad(serie):
     Imprima el valor p de cada versión, elija d y D, y guarde la ACF y la
     PACF de la serie elegida en figuras/acf_pacf.png. Devuelva (d, D).
     """
-    raise NotImplementedError("estacionariedad, ACF y PACF")
+    d, D = 1, 0
+    escalada = serie / ESCALA
+    estacionaria = escalada.copy()
+    if D == 1:
+        estacionaria = estacionaria.diff(PERIODO)
+    if d == 1:
+        estacionaria = estacionaria.diff()
+    estacionaria = estacionaria.dropna()
+    print(f"{len(estacionaria)} meses en la serie estacionaria")
+    print(f"banda de confianza: ±{1.96 / np.sqrt(len(estacionaria)):.3f}")
+    lags = min(24, len(estacionaria) // 2 - 1)
+    figura, ejes = plt.subplots(1, 2, figsize=(11, 3.4))
+    plot_acf(estacionaria, lags=lags, ax=ejes[0], title="ACF")
+    plot_pacf(estacionaria, lags=lags, ax=ejes[1], title="PACF")
+    figura.tight_layout()
+    figura.savefig(FIGURAS / "acf_pacf.png", dpi=120)
+    plt.close(figura)
+    return d, D
+
+
 
 
 # ============================================================
