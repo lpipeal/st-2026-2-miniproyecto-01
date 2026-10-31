@@ -56,10 +56,10 @@ DECISION = (
 )
 
 def preparar(serie):
-    """TODO: aplique la decisión del grupo sobre huecos y datos atípicos.
+    """Valida los huecos y conserva los valores originales de la serie.
 
-    Por ejemplo, interpolar los meses vacíos o recortar el tramo afectado.
-    Debe devolver una serie sin NaN.
+    Rechaza series vacías o con NaN para exigir una decisión explícita.
+    El criterio 1,5 × IQR se usa como diagnóstico, sin recorte automático.
     """
     if serie.empty:
         raise ValueError("La serie está vacía.")
@@ -74,6 +74,11 @@ def preparar(serie):
     limite_inferior = q1 - 1.5 * iqr
     limite_superior = q3 + 1.5 * iqr
     atipicos = serie[(serie < limite_inferior) | (serie > limite_superior)]
+    print(
+        f"Diagnóstico IQR: Q1={q1:.2f}; Q3={q3:.2f}; IQR={iqr:.2f}; "
+        f"límites=[{limite_inferior:.2f}, {limite_superior:.2f}]."
+    )
+    print(f"Rango observado: [{serie.min():.2f}, {serie.max():.2f}].")
     print(
         f"Atípicos según 1,5 × IQR: {len(atipicos)}; "
         "se conservan los valores originales."

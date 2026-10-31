@@ -12,8 +12,35 @@ número de observaciones. Por qué el grupo la eligió.}}
 
 ![La serie](../figuras/serie.png)
 
-{{Huecos y datos atípicos: cuáles hay, qué se decidió con cada uno y por qué.
-Esta decisión es la columna `decision` de la tabla.}}
+La revisión del calendario mensual, de enero de 2014 a mayo de 2026, mostró
+149 observaciones y ningún mes faltante. Por ello, no fue necesario imputar
+ni interpolar datos. La función `preparar` verifica que la serie no esté
+vacía ni contenga valores ausentes; si los encuentra, detiene la ejecución
+para exigir una decisión explícita sobre su tratamiento.
+
+Para identificar posibles datos atípicos se aplicó el criterio de
+$1{,}5\times IQR$ a los valores originales, donde:
+
+$$
+IQR = Q_3 - Q_1, \qquad
+L_{\mathrm{inf}} = Q_1 - 1{,}5\,IQR, \qquad
+L_{\mathrm{sup}} = Q_3 + 1{,}5\,IQR.
+$$
+
+Se obtuvo $Q_1=75\,367$, $Q_3=101\,146$ e $IQR=25\,779$ vehículos.
+Los límites fueron 36.698,5 y 139.814,5 vehículos. El mínimo observado fue
+60.922 y el máximo 112.471; ningún valor quedó fuera de los límites, por
+lo que se detectaron **cero atípicos según este criterio**.
+
+El IQR se calculó sobre toda la serie y no considera su orden temporal:
+este resultado no descarta meses inusuales respecto de la tendencia o la
+estacionalidad, que se examinan mediante la descomposición y los residuos.
+
+La decisión aplicada en `preparar` coincide con el texto de `DECISION`,
+que se incluye en la columna `decision` de la tabla de métricas:
+
+> Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR.
+> Se conservaron los valores originales, sin corrección automática.
 
 ## 2. Componentes
 
