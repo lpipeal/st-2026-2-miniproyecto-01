@@ -241,7 +241,22 @@ def exogenas(serie):
     Por ejemplo, el número de festivos o de días hábiles de cada mes. Debe
     cubrir también los 12 meses que siguen al final de la serie.
     """
-    raise NotImplementedError("variables exógenas")
+    anios = range(serie.index[0].year, serie.index[-1].year + 2)
+    indice = pd.date_range(
+        serie.index[0], periods=len(serie) + PERIODO, freq="MS"
+    )
+    calendario_festivos = holidays.country_holidays(PAIS, years=anios)
+    fechas_festivos = pd.to_datetime(list(calendario_festivos.keys()))
+    conteo_mensual = (
+        pd.Series(1, index=fechas_festivos)
+        .resample("MS")
+        .sum()
+        .reindex(indice, fill_value=0)
+        .astype(float)
+        .rename("festivos")
+    )
+    return conteo_mensual.to_frame()
+
 
 
 def modelo_sarimax(orden, orden_estacional, x):
