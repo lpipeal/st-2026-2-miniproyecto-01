@@ -386,16 +386,18 @@ def modelo_sarima(orden, orden_estacional):
 
 
 def exogenas(serie):
-    """TODO: DataFrame de variables conocidas de antemano, con el índice de la serie.
+    """Cuenta fechas festivas nacionales por mes y cubre 12 meses adicionales.
 
-    Por ejemplo, el número de festivos o de días hábiles de cada mes. Debe
-    cubrir también los 12 meses que siguen al final de la serie.
+    Usa las fechas de la serie y el calendario implementado en holidays,
+    sin consultar los valores de tráfico. Cada fecha festiva se cuenta una vez.
     """
-    anios = range(serie.index[0].year, serie.index[-1].year + 2)
     indice = pd.date_range(
         serie.index[0], periods=len(serie) + PERIODO, freq="MS"
     )
-    calendario_festivos = holidays.country_holidays(PAIS, years=anios)
+    anios = range(indice[0].year, indice[-1].year + 1)
+    calendario_festivos = holidays.country_holidays(
+        PAIS, years=anios, observed=True, language="es"
+    )
     fechas_festivos = pd.to_datetime(list(calendario_festivos.keys()))
     conteo_mensual = (
         pd.Series(1, index=fechas_festivos)
@@ -405,7 +407,23 @@ def exogenas(serie):
         .astype(float)
         .rename("festivos")
     )
-    return conteo_mensual.to_frame()
+    x = conteo_mensual.to_frame()
+    futuros = x.loc[fechas_siguientes(serie, PERIODO)]
+    print(
+        f"\nExógena festivos: país={PAIS}; holidays={holidays.__version__}; "
+        f"{len(x)} meses, de {x.index[0]:%Y-%m} a {x.index[-1]:%Y-%m}."
+    )
+    print(
+        f"Cobertura: {len(serie)} meses históricos y {len(futuros)} adicionales; "
+        f"valores ausentes={x.isna().sum().sum()}."
+    )
+    print(
+        f"Conteo histórico: mínimo={x.loc[serie.index, 'festivos'].min():.0f}; "
+        f"máximo={x.loc[serie.index, 'festivos'].max():.0f}."
+    )
+    print("Calendario para los meses adicionales según la versión indicada:")
+    print(futuros.to_string(formatters={"festivos": lambda valor: f"{valor:.0f}"}))
+    return x
 
 
 

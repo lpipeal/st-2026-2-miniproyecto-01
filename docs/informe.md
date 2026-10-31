@@ -340,8 +340,65 @@ La convergencia confirma que el optimizador terminó según su criterio;
 la autocorrelación residual detectada antes sigue siendo una limitación
 del modelo.
 
-{{La variable exógena: qué es, por qué se conoce de antemano y si mejora al
-SARIMA.}}
+La variable exógena elegida es **el número de fechas festivas nacionales
+de Colombia en cada mes**, almacenado en la columna `festivos`. Como
+hipótesis de trabajo, los festivos pueden modificar la actividad de
+transporte de carga y ayudar a explicar variaciones que el patrón anual
+por sí solo no recoge. El signo y la utilidad de su efecto se deben
+evaluar con el ajuste y el backtest.
+
+Para construirla se usó `holidays` versión 0.107, con país `CO` y
+`observed=True`, que incluye las fechas de observancia o traslado
+implementadas en su calendario. Se asignó un 1 a cada fecha festiva y se
+sumaron esos valores por mes. La biblioteca identifica los festivos por
+fecha, por lo que dos celebraciones que coincidan en un día se cuentan
+una sola vez. Se incluyen las fechas reconocidas como festivas aunque
+caigan en fin de semana; la variable no equivale a un conteo de días
+hábiles perdidos. La fuente del calendario es la
+[implementación de Colombia](https://holidays.readthedocs.io/en/latest/auto_gen_docs/colombia/)
+y las opciones se describen en la
+[API de holidays](https://holidays.readthedocs.io/en/latest/api/).
+
+La función devuelve un `DataFrame` con el mismo índice mensual de la
+serie histórica, ampliado en 12 meses. En esta ejecución contiene **161
+filas, de enero de 2014 a mayo de 2027, sin valores ausentes**: 149 meses
+históricos y 12 adicionales. Los meses sin festivos reciben cero; ese
+cero representa un conteo válido. En el tramo histórico el conteo varía
+entre 0 y 3 fechas por mes.
+
+| Mes adicional | Fechas festivas |
+|---|---:|
+| Junio de 2026 | 3 |
+| Julio de 2026 | 2 |
+| Agosto de 2026 | 2 |
+| Septiembre de 2026 | 0 |
+| Octubre de 2026 | 1 |
+| Noviembre de 2026 | 2 |
+| Diciembre de 2026 | 2 |
+| Enero de 2027 | 2 |
+| Febrero de 2027 | 0 |
+| Marzo de 2027 | 3 |
+| Abril de 2027 | 0 |
+| Mayo de 2027 | 3 |
+
+Para los horizontes del backtest, de junio de 2024 a mayo de 2026, las
+fechas festivas se obtienen de reglas de calendario disponibles antes
+de los respectivos orígenes. La función solo utiliza el índice temporal
+y el país; no consulta los valores observados de tráfico para construir
+la variable. Incluir los meses de validación en este calendario permite
+proporcionar sus exógenas al pronosticar, sin usar el tráfico futuro.
+
+La extensión posterior a mayo de 2026 corresponde a las reglas de la
+versión utilizada en la revisión del 31 de octubre de 2026. Esa versión
+incorpora el nuevo festivo de Nuestra Señora del Rosario de Chiquinquirá,
+creado por la [Ley 2578 de junio de 2026, artículos 6 y 7](https://lector.ramajudicial.gov.co/SIDN/NORMATIVA/TEXTOS_COMPLETOS/7_LEYES/LEYES%202026/Ley%202578%20de%202026.pdf).
+Ese cambio no afecta los meses evaluados en el backtest, pero el
+calendario extendido no debe interpretarse como información disponible
+en un pronóstico emitido al cierre de mayo de 2026: una simulación desde
+ese origen usaría únicamente las reglas conocidas entonces.
+
+{{Comparación del SARIMAX con el SARIMA: métricas y efecto de la exógena,
+después de verificar la convergencia de sus ajustes.}}
 
 ## 6. Tabla de métricas
 
