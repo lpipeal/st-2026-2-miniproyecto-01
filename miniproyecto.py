@@ -24,6 +24,7 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import STL
+from statsmodels.tsa.stattools import acf, adfuller, pacf
 
 
 from comun import (RAIZ, backtest, cargar_serie, estacional_ingenuo,  # noqa: E402
@@ -157,25 +158,90 @@ def descomponer(serie):
 # ============================================================
 
 def estacionariedad(serie):
-    """TODO: ADF sobre la serie, su diferencia regular, la estacional y las dos.
+    """Contrasta cuatro transformaciones y documenta la elección de d y D.
 
-    Imprima el valor p de cada versión, elija d y D, y guarde la ACF y la
-    PACF de la serie elegida en figuras/acf_pacf.png. Devuelva (d, D).
+    Usa constante y tendencia en niveles, y constante tras diferenciar.
+    Genera ACF/PACF de la diferencia regular y devuelve la decisión (1, 0).
     """
-    d, D = 1, 0
+    alfa = 0.05
     escalada = serie / ESCALA
-    estacionaria = escalada.copy()
-    if D == 1:
-        estacionaria = estacionaria.diff(PERIODO)
-    if d == 1:
-        estacionaria = estacionaria.diff()
-    estacionaria = estacionaria.dropna()
-    print(f"{len(estacionaria)} meses en la serie estacionaria")
-    print(f"banda de confianza: ±{1.96 / np.sqrt(len(estacionaria)):.3f}")
+    versiones = {
+        "original": (escalada, "ct"),
+        "diferencia regular": (escalada.diff().dropna(), "c"),
+        "diferencia estacional": (escalada.diff(PERIODO).dropna(), "c"),
+        "ambas diferencias": (escalada.diff(PERIODO).diff().dropna(), "c"),
+    }
+    resultados_adf = {}
+    for nombre, (valores, regresion) in versiones.items():
+        estadistico, valor_p, rezagos, nobs = adfuller(
+            valores, regression=regresion, autolag="AIC"
+        )[:4]
+        resultados_adf[nombre] = {
+            "regression": regresion,
+            "ADF": estadistico,
+            "valor_p": valor_p,
+            "rezagos": rezagos,
+            "nobs": nobs,
+            "rechaza_H0": "sí" if valor_p < alfa else "no",
+        }
+
+    tabla_adf = pd.DataFrame.from_dict(resultados_adf, orient="index")
+    tabla_adf.index.name = "version"
+    print(f"\nADF: H0 = No estacionaria; alfa={alfa}; autolag=AIC.")
+    print(tabla_adf.to_string(formatters={
+        "ADF": lambda valor: f"{valor:.4f}",
+        "valor_p": lambda valor: f"{valor:.8f}",
+    }))
+
+    # Decisión del grupo para esta serie: una diferencia regular es suficiente
+    # para rechazar H0; se estudia la dependencia anual con P y Q.
+    # ADF no contrasta específicamente la existencia de raíces estacionales.
+    if (resultados_adf["original"]["valor_p"] < alfa
+            or resultados_adf["diferencia regular"]["valor_p"] >= alfa):
+        raise ValueError(
+            "Los resultados ADF cambiaron: revise la justificación de d=1, D=0."
+        )
+    d, D = 1, 0
+    print(
+        "Elección del grupo: d=1, D=0. La diferencia regular rechaza raíz "
+        "unitaria al 5 %; se conserva como transformación inicial sin añadir "
+        "una diferencia estacional. La dependencia anual se estudia con P y Q."
+    )
+    estacionaria = versiones["diferencia regular"][0]
+    print(f"{len(estacionaria)} meses tras la diferencia regular")
+    print(
+        "Bandas del 95 %: ACF según Bartlett; "
+        f"PACF aproximadamente ±{1.96 / np.sqrt(len(estacionaria)):.3f}."
+    )
     lags = min(24, len(estacionaria) // 2 - 1)
+    valores_acf, intervalos_acf = acf(
+        estacionaria, nlags=lags, alpha=alfa, fft=False, bartlett_confint=True
+    )
+    valores_pacf, intervalos_pacf = pacf(
+        estacionaria, nlags=lags, alpha=alfa, method="ywm"
+    )
+    for nombre, valores, intervalos in (
+        ("ACF", valores_acf, intervalos_acf),
+        ("PACF", valores_pacf, intervalos_pacf),
+    ):
+        fuera = (intervalos[1:, 0] > 0) | (intervalos[1:, 1] < 0)
+        significativos = pd.DataFrame({
+            "rezago": np.arange(1, lags + 1)[fuera],
+            "coeficiente": valores[1:][fuera],
+        })
+        print(f"{nombre}: rezagos fuera de las bandas del 95 % (sin rezago 0):")
+        print(significativos.to_string(
+            index=False, float_format=lambda valor: f"{valor:.4f}"
+        ))
+
     figura, ejes = plt.subplots(1, 2, figsize=(11, 3.4))
-    plot_acf(estacionaria, lags=lags, ax=ejes[0], title="ACF")
-    plot_pacf(estacionaria, lags=lags, ax=ejes[1], title="PACF")
+    plot_acf(
+        estacionaria, lags=lags, ax=ejes[0], title="ACF", alpha=alfa,
+        fft=False, bartlett_confint=True
+    )
+    plot_pacf(
+        estacionaria, lags=lags, ax=ejes[1], title="PACF", alpha=alfa, method="ywm"
+    )
     figura.tight_layout()
     figura.savefig(FIGURAS / "acf_pacf.png", dpi=120)
     plt.close(figura)

@@ -105,12 +105,89 @@ prueba. Por qué ningún dato posterior al origen entra al modelo.}}
 
 ## 4. Estacionariedad e identificación
 
-{{Valor p de la prueba ADF para la serie, su diferencia regular, la
-estacional y las dos juntas. El d y el D elegidos.}}
+Se aplicó la prueba Dickey–Fuller aumentada (ADF) a la serie original y a
+tres transformaciones, con un nivel de significancia del 5 %. La hipótesis
+nula $H_0$ es que es estacionaria; se rechaza cuando el valor p es
+menor que 0,05. No rechazar $H_0$ no demuestra que la raíz exista, pero
+indica que esta prueba no aporta evidencia suficiente para descartarla.
+
+Las transformaciones comparadas fueron la diferencia regular
+$\Delta y_t=y_t-y_{t-1}$, la diferencia estacional
+$\Delta_{12}y_t=y_t-y_{t-12}$ y su combinación
+$\Delta\Delta_{12}y_t$. Los primeros valores ausentes producidos por cada
+diferencia se retiraron antes de aplicar ADF. El cálculo se realizó sobre
+la serie dividida por 10.000, igual que en los modelos; este cambio de
+unidad no modifica la decisión sobre la hipotesis nula.
+
+En niveles se usó `regression="ct"`, con constante y tendencia lineal,
+porque la gráfica y STL muestran crecimiento de largo plazo. En las
+versiones diferenciadas se usó `regression="c"`: se permite una media
+distinta de cero tras diferenciar y no se añade una tendencia lineal
+determinista a los cambios. Los rezagos auxiliares se seleccionaron con
+`autolag="AIC"`, dentro del máximo predeterminado de la biblioteca. Estos
+parámetros y la hipótesis del contraste se describen en la
+[documentación de ADF en statsmodels](https://www.statsmodels.org/stable/generated/statsmodels.tsa.stattools.adfuller.html).
+
+| Versión | `regression` | Estadístico ADF | Valor p | Rezagos ADF | Observaciones efectivas | Rechaza $H_0$ al 5 % |
+|---|---|---:|---:|---:|---:|---|
+| Original | `ct` | −1,9617 | 0,62214390 | 13 | 135 | No |
+| Diferencia regular | `c` | −3,8263 | 0,00264947 | 11 | 136 | Sí |
+| Diferencia estacional | `c` | −2,4295 | 0,13358578 | 13 | 123 | No |
+| Ambas diferencias | `c` | −4,8596 | 0,00004176 | 13 | 122 | Sí |
+
+La columna de observaciones efectivas descuenta tanto la diferenciación
+como las observaciones necesarias para la regresión ADF y sus rezagos.
+Por ello, no equivale a la longitud de cada versión de la serie.
+
+Se eligió **$d=1$ y $D=0$ como especificación inicial**. La prueba no
+rechaza hipotesis nula en niveles y sí la rechaza después de una diferencia
+regular. La diferencia estacional sola no logra ese rechazo. Ambas
+diferencias también lo logran, pero su menor valor p no convierte esa
+transformación en un mejor modelo: una diferencia regular ya proporciona
+evidencia contra la no estacionariedad y conserva 148 observaciones, frente a
+136 al aplicar ambas.
+La ADF utilizada no es un contraste específico de raíces estacionales y
+su rechazo no demuestra por sí solo todas las condiciones de
+estacionariedad. Por ello, **$D=0$ es una decisión de modelado que se
+contrasta después con el ajuste y los residuos**. La dependencia anual
+que permanezca se estudia mediante los términos estacionales $P$ y $Q$
+del SARIMA; no se interpreta $D=0$ como ausencia de estacionalidad.
 
 ![ACF y PACF](../figuras/acf_pacf.png)
 
-{{Qué rezagos salen de las bandas y qué órdenes sugieren.}}
+La figura corresponde a la diferencia regular, con 148 observaciones,
+desde febrero de 2014 hasta mayo de 2026, y muestra los primeros 24
+rezagos. Se usaron bandas del 95 % calculadas con Bartlett para la ACF y
+una PACF estimada por Yule–Walker sin ajuste (`method="ywm"`), con banda
+aproximada de $\pm1{,}96/\sqrt{148}=\pm0{,}161$. Las bandas ACF varían
+según el rezago; no se les aplica ese mismo umbral constante. Las opciones
+se detallan en la documentación de
+[ACF](https://www.statsmodels.org/stable/generated/statsmodels.graphics.tsaplots.plot_acf.html)
+y [PACF](https://www.statsmodels.org/stable/generated/statsmodels.graphics.tsaplots.plot_pacf.html).
+
+Los coeficientes que salen de las bandas, excluido el rezago cero, son:
+
+| Rezago | ACF fuera de banda | PACF fuera de banda |
+|---:|---:|---:|
+| 1 | −0,5250 | −0,5250 |
+| 2 | — | −0,2307 |
+| 4 | −0,2326 | −0,1878 |
+| 8 | — | −0,2110 |
+| 11 | — | −0,1843 |
+| 12 | +0,3904 | +0,2788 |
+| 13 | −0,2976 | — |
+
+El guion indica los mismos rezagos y coeficientes. Una raya significa que
+el coeficiente queda dentro de la banda de esa función.
+
+El pico negativo de la ACF en el rezago 1 sugiere incluir un término MA(1)
+entre los candidatos. El pico anual en el rezago 12 de ambas funciones
+motiva explorar términos AR y MA estacionales. Los picos adicionales no
+permiten identificar un único orden de forma concluyente; se propone la
+rejilla pequeña $p,q,P,Q\in\{0,1\}$, manteniendo $d=1$, $D=0$ y periodo
+12, para comparar las combinaciones por AIC y revisar sus residuos.
+Estas bandas se usan como guía exploratoria, no como una selección
+automática del modelo.
 
 ## 5. Modelos clásicos
 
