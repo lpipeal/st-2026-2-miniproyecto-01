@@ -1,14 +1,39 @@
 # Informe del miniproyecto 1
 
-Llene cada sección reemplazando los marcadores `{{...}}`, sin quitar las
-secciones. Las cifras salen de lo que imprime `python miniproyecto.py` y las
-figuras son las que ese guion deja en `figuras/`. Las fórmulas van en LaTeX
-(`$...$` o `$$...$$`).
+Se analiza una serie mensual de tráfico del peaje Siberia para comparar
+dos líneas base, un SARIMA y un SARIMAX con festivos. Los resultados se
+reproducen ejecutando `python miniproyecto.py`, que genera las figuras y
+la tabla `resultados/metricas.csv` citadas en este informe.
 
 ## 1. La serie
 
-{{Qué mide la serie, de dónde sale (fuente y licencia), frecuencia, periodo y
-número de observaciones. Por qué el grupo la eligió.}}
+La serie mide el **número mensual de vehículos de categorías tarifarias
+III a VII que pasan por el peaje Siberia**, en el corredor
+Bogotá–Medellín. Se obtuvo del conjunto público
+[Tráfico Vehicular ANI](https://www.datos.gov.co/d/8yi9-t44c), publicado
+por la Agencia Nacional de Infraestructura. Los
+[metadatos de la fuente](https://www.datos.gov.co/api/views/8yi9-t44c.json)
+identifican a la ANI como entidad responsable y declaran la licencia
+**Creative Commons Atribución-CompartirIgual 4.0 Internacional
+(CC BY-SA 4.0)**.
+
+El archivo analizado es `datos/trafico_vehicular_peaje_siberia.csv`, con
+**149 observaciones mensuales, de enero de 2014 a mayo de 2026**. La
+columna `mes` indica el primer día del mes y `total` contiene el conteo
+que se pronostica, expresado en vehículos por mes. El CSV se construyó
+sumando `cantidadtrafico` por mes para el peaje Siberia y las categorías
+III a VII, mediante la API de Datos Abiertos Colombia. La consulta se
+documenta en [la ficha de los datos](../datos/README.md). Este total
+corresponde a las categorías seleccionadas, no al tránsito de todas las
+categorías del peaje.
+
+La selección se sustenta en la disponibilidad pública de los datos, su
+longitud superior a las 60 observaciones exigidas y la presencia de un
+patrón anual que se examina con STL y ACF/PACF. Su interés aplicado es
+estudiar la evolución del tránsito de estas categorías y comprobar si el
+calendario de festivos aporta información predictiva. La extensión de
+la muestra permite reservar los últimos 24 meses para evaluar sin
+reducir el primer entrenamiento a menos de tres años.
 
 ![La serie](../figuras/serie.png)
 
@@ -93,8 +118,9 @@ frente a una tendencia estimada de 85.243,04 y un efecto estacional de
 −2.933,23. La suma de tendencia y estacionalidad fue 82.309,81 vehículos;
 el dato observado quedó 14.007,81 por debajo de esa suma.
 Este residuo mide la desviación respecto de los componentes estimados por
-STL. Su magnitud muestra que puede existir un mes inusual en su contexto
-temporal debido a la pandemia.
+STL. El mes coincide con el contexto de la pandemia de 2020; esta
+descomposición describe la desviación, pero no identifica su causa ni
+estima un efecto causal de la pandemia.
 
 ## 3. Líneas base y backtest
 
@@ -117,6 +143,25 @@ del backtest.
 Los horizontes de evaluación se solapan entre orígenes. Se calculan RMSE,
 MAE y MAPE sobre los 12 pronósticos de cada origen y después se promedia
 cada métrica entre los 13 orígenes, tal como establece `comun.py`.
+
+Para un origen $o$ y un horizonte $H=12$, las métricas son:
+
+$$
+\mathrm{RMSE}_o=\sqrt{\frac{1}{H}\sum_{h=1}^{H}
+(y_{o+h}-\hat y_{o+h\mid o})^2}, \qquad
+\mathrm{MAE}_o=\frac{1}{H}\sum_{h=1}^{H}
+|y_{o+h}-\hat y_{o+h\mid o}|,
+$$
+
+$$
+\mathrm{MAPE}_o=\frac{100}{H}\sum_{h=1}^{H}
+\left|\frac{y_{o+h}-\hat y_{o+h\mid o}}{y_{o+h}}\right|.
+$$
+
+Para cada métrica se informa $\overline M=\frac{1}{13}\sum_o M_o$.
+RMSE y MAE se expresan en vehículos y MAPE en porcentaje. Los valores
+reales de esta serie son positivos, de modo que MAPE no presenta
+divisiones por cero.
 
 | Línea base | RMSE (vehículos) | MAE (vehículos) | MAPE (%) |
 |---|---:|---:|---:|
@@ -142,7 +187,7 @@ $\Delta_{12}y_t=y_t-y_{t-12}$ y su combinación
 $\Delta\Delta_{12}y_t$. Los primeros valores ausentes producidos por cada
 diferencia se retiraron antes de aplicar ADF. El cálculo se realizó sobre
 la serie dividida por 10.000, igual que en los modelos; este cambio de
-unidad no modifica la decisión sobre la hipotesis nula.
+unidad no modifica la decisión sobre la hipótesis nula.
 
 En niveles se usó `regression="ct"`, con constante y tendencia lineal,
 porque la gráfica y STL muestran crecimiento de largo plazo. En las
@@ -165,11 +210,11 @@ como las observaciones necesarias para la regresión ADF y sus rezagos.
 Por ello, no equivale a la longitud de cada versión de la serie.
 
 Se eligió **$d=1$ y $D=0$ como especificación inicial**. La prueba no
-rechaza hipotesis nula en niveles y sí la rechaza después de una diferencia
+rechaza la hipótesis nula en niveles y sí la rechaza después de una diferencia
 regular. La diferencia estacional sola no logra ese rechazo. Ambas
 diferencias también lo logran, pero su menor valor p no convierte esa
 transformación en un mejor modelo: una diferencia regular ya proporciona
-evidencia contra la no estacionariedad y conserva 148 observaciones, frente a
+evidencia contra la raíz unitaria y conserva 148 observaciones, frente a
 136 al aplicar ambas.
 La ADF utilizada no es un contraste específico de raíces estacionales y
 su rechazo no demuestra por sí solo todas las condiciones de
@@ -461,15 +506,57 @@ todos los ajustes que las producen tienen convergencia comprobada.
 
 ## 6. Tabla de métricas
 
-{{Copie aquí `resultados/metricas.csv` como tabla de Markdown, ordenada por
-RMSE.}}
+La siguiente tabla reproduce [resultados/metricas.csv](../resultados/metricas.csv),
+generado por el guion y ordenado por RMSE de menor a mayor. Todos los
+modelos usan los mismos 13 orígenes y horizontes de 12 meses. RMSE y
+MAE están expresados en vehículos; MAPE, en porcentaje.
 
 | Modelo | Decisión | RMSE | MAE | MAPE (%) |
 |---|---|---|---|---|
-| {{...}} | {{...}} | {{...}} | {{...}} | {{...}} |
+| SARIMAX(0, 1, 1)(1, 0, 1, 12) + exógenas | Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. Se conservaron los valores originales, sin corrección automática. | 4.137,53 | 3.471,17 | 3,34 |
+| SARIMA(0, 1, 1)(1, 0, 1, 12) | Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. Se conservaron los valores originales, sin corrección automática. | 4.494,34 | 3.747,91 | 3,59 |
+| estacional ingenuo | Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. Se conservaron los valores originales, sin corrección automática. | 6.833,25 | 5.770,06 | 5,56 |
+| ingenuo | Sin meses faltantes; no se detectaron atípicos con el criterio 1,5 × IQR. Se conservaron los valores originales, sin corrección automática. | 7.379,41 | 6.353,49 | 6,12 |
 
 ## 7. Conclusión
 
-{{El mejor modelo clásico, cuánto mejora a la mejor línea base en cada
-métrica y en qué meses o tramos sigue fallando. Es el modelo que el
-miniproyecto 2 debe superar.}}
+El mejor modelo clásico de este experimento es **SARIMAX$(0,1,1)(1,0,1)_{12}$
+con el conteo mensual de festivos**, que obtiene el menor RMSE y también
+el menor MAE y MAPE. La mejor línea base es el estacional ingenuo.
+La reducción relativa de cada métrica se calcula como:
+
+$$
+\mathrm{Mejora}(\%)=100\,
+\frac{M_{\mathrm{base}}-M_{\mathrm{SARIMAX}}}{M_{\mathrm{base}}}.
+$$
+
+| Métrica | Estacional ingenuo | SARIMAX + festivos | Reducción absoluta | Mejora relativa |
+|---|---:|---:|---:|---:|
+| RMSE (vehículos) | 6.833,25 | 4.137,53 | 2.695,72 vehículos | 39,45 % |
+| MAE (vehículos) | 5.770,06 | 3.471,17 | 2.298,89 vehículos | 39,84 % |
+| MAPE (%) | 5,56 | 3,34 | 2,22 puntos porcentuales | 39,93 % |
+
+Las reducciones se calculan directamente a partir de las cifras
+redondeadas publicadas en `resultados/metricas.csv`, mediante la fórmula
+anterior. La reducción absoluta de MAPE se expresa en puntos porcentuales;
+la mejora relativa se expresa en porcentaje respecto de la línea base.
+
+Las salidas conservadas del guion resumen el desempeño por modelo.
+Por ello, no se atribuyen errores a meses u orígenes concretos del
+SARIMAX. La figura de diagnóstico corresponde al SARIMA y no permite
+atribuir sus mismos fallos al SARIMAX.
+
+La utilidad de los festivos en este backtest no establece una relación
+causal ni garantiza el mismo resultado fuera del periodo evaluado.
+Además, los órdenes se eligieron con la serie completa antes del
+backtest; aunque los coeficientes se reajustan usando solo el
+entrenamiento de cada origen, la comparación queda condicionada a esa
+selección de estructura. Una evaluación que reserve totalmente la
+prueba seleccionaría también los órdenes sin usar ese periodo.
+El diagnóstico del SARIMA, por su parte, mostró autocorrelación
+residual y mantiene abierta la revisión de la especificación.
+
+El **SARIMAX con festivos queda como referencia que debe superar el
+miniproyecto 2**, usando los mismos orígenes, horizontes y métricas para
+que la comparación sea consistente y documentando cualquier cambio
+en la selección de modelos.
