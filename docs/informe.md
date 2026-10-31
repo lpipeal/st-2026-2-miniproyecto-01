@@ -46,9 +46,55 @@ que se incluye en la columna `decision` de la tabla de métricas:
 
 ![STL](../figuras/stl.png)
 
-{{Lectura de la descomposición STL: cómo es la tendencia, qué meses quedan
-arriba y abajo en la estacional y con cuánto, y dónde está el residuo más
-grande.}}
+Se aplicó una descomposición STL aditiva con periodo de 12 meses y ajuste
+robusto (`robust=True`). La serie se expresa como:
+
+$$
+y_t = T_t + S_t + R_t,
+$$
+
+donde $T_t$ es la tendencia, $S_t$ la componente estacional y $R_t$ el
+residuo. Las tres componentes se expresan en vehículos por mes.
+
+La tendencia muestra un crecimiento de largo plazo: pasa de **67.411,64
+vehículos en enero de 2014 a 104.681,43 en mayo de 2026**, un aumento de
+37.269,79 vehículos, equivalente al **55,29 %** del nivel inicial estimado.
+El crecimiento no es uniforme: la curva presenta una mayor pendiente
+alrededor de 2019–2021 y variaciones más moderadas desde 2022.
+
+Para resumir la estacionalidad se promedió la componente $S_t$ de cada mes
+del calendario sobre los años disponibles. Un efecto positivo se suma al
+nivel de tendencia y uno negativo lo reduce:
+
+| Mes | Efecto estacional medio (vehículos) |
+|---|---:|
+| Enero | −2.450,31 |
+| Febrero | −5.441,71 |
+| Marzo | −91,21 |
+| Abril | −1.834,54 |
+| Mayo | +1.696,45 |
+| Junio | −4.598,51 |
+| Julio | +1.573,85 |
+| Agosto | +904,56 |
+| Septiembre | +2.427,20 |
+| Octubre | +4.405,89 |
+| Noviembre | +1.426,12 |
+| Diciembre | +2.429,05 |
+
+**Octubre tiene el mayor efecto estacional medio y febrero el menor**;
+junio también presenta una reducción marcada respecto de la tendencia.
+Estos valores resumen la componente estimada, cuyo efecto puede cambiar
+entre años. Enero a mayo cuentan con 13 observaciones por mes y los demás
+meses con 12, porque la muestra termina en mayo de 2026.
+
+El **mayor residuo en valor absoluto corresponde a abril de 2020**, con
+$R_t=-14\,007{,}81$ vehículos. Ese mes se observaron 68.302 vehículos,
+frente a una tendencia estimada de 85.243,04 y un efecto estacional de
+−2.933,23. La suma de tendencia y estacionalidad fue 82.309,81 vehículos;
+el dato observado quedó 14.007,81 por debajo de esa suma.
+Este residuo mide la desviación respecto de los componentes estimados por
+STL. Su magnitud muestra que puede existir un mes inusual en su contexto
+temporal debido a la pandemia.
 
 ## 3. Líneas base y backtest
 

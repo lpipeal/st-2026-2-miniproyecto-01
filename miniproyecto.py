@@ -105,12 +105,50 @@ def graficar_serie(serie):
 # ============================================================
 
 def descomponer(serie):
-    """TODO: STL robusta con el periodo de la serie; guarde figuras/stl.png."""
+    """Genera la STL robusta y resume sus componentes en unidades originales."""
     with plt.rc_context({"figure.figsize": (8, 3.4), "font.size": 11}):
         resultado = STL(serie, period=PERIODO, robust=True).fit()
         figura = resultado.plot()
         figura.savefig(FIGURAS / "stl.png", dpi=120)
     plt.close(figura)
+
+    tendencia = resultado.trend
+    cambio = tendencia.iloc[-1] - tendencia.iloc[0]
+    print(f"\nSTL robusta con periodo {PERIODO}:")
+    print(
+        f"Tendencia: {tendencia.index[0]:%Y-%m}={tendencia.iloc[0]:.2f}; "
+        f"{tendencia.index[-1]:%Y-%m}={tendencia.iloc[-1]:.2f} vehículos."
+    )
+    print(
+        f"Cambio de tendencia: {cambio:.2f} vehículos "
+        f"({100 * cambio / tendencia.iloc[0]:.2f} %)."
+    )
+
+    nombres_meses = (
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+    )
+    estacional_por_mes = resultado.seasonal.groupby(serie.index.month).mean()
+    estacional_por_mes.index = pd.Index(
+        [nombres_meses[mes - 1] for mes in estacional_por_mes.index], name="mes"
+    )
+    print("Componente estacional media por mes (vehículos):")
+    print(estacional_por_mes.to_frame("efecto_medio").to_string(
+        float_format=lambda valor: f"{valor:.2f}"
+    ))
+
+    fecha_residuo = resultado.resid.abs().idxmax()
+    print(
+        f"Mayor residuo absoluto: {fecha_residuo:%Y-%m}, "
+        f"residuo={resultado.resid.loc[fecha_residuo]:.2f} vehículos."
+    )
+    print(
+        f"En ese mes: observado={serie.loc[fecha_residuo]:.2f}; "
+        f"tendencia={tendencia.loc[fecha_residuo]:.2f}; "
+        f"estacional={resultado.seasonal.loc[fecha_residuo]:.2f}; "
+        f"tendencia + estacional="
+        f"{tendencia.loc[fecha_residuo] + resultado.seasonal.loc[fecha_residuo]:.2f}."
+    )
 
 
 
