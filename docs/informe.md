@@ -397,8 +397,67 @@ calendario extendido no debe interpretarse como información disponible
 en un pronóstico emitido al cierre de mayo de 2026: una simulación desde
 ese origen usaría únicamente las reglas conocidas entonces.
 
-{{Comparación del SARIMAX con el SARIMA: métricas y efecto de la exógena,
-después de verificar la convergencia de sus ajustes.}}
+La función `modelo_sarimax` conserva los órdenes
+$(0,1,1)(1,0,1)_{12}$ e incorpora la columna `festivos`. En cada origen
+ajusta con `x.loc[entrenamiento.index]` y pronostica con las exógenas de
+las 12 fechas siguientes, seleccionadas mediante `fechas_siguientes`.
+Los valores futuros de tráfico se reservan para evaluar el pronóstico.
+Se divide el entrenamiento por 10.000 y se multiplica el pronóstico por
+10.000 para devolverlo en vehículos, igual que en el SARIMA.
+
+Con $z_t=y_t/10\,000$ y $x_t$ el conteo mensual de festivos, la
+especificación es una regresión con errores SARIMA:
+
+$$
+z_t=\beta x_t+u_t, \qquad
+(1-\Phi_1B^{12})(1-B)u_t
+=(1+\theta_1B)(1+\Theta_1B^{12})\varepsilon_t.
+$$
+
+Los coeficientes se vuelven a estimar con el entrenamiento de cada
+origen. El modelo permite hasta **200 iteraciones de L-BFGS**, usando
+`method="statespace"` y
+`method_kwargs={"method": "lbfgs", "maxiter": 200}`. Estas opciones
+se pasan al estimador mediante la
+[API de ajuste de ARIMA](https://www.statsmodels.org/stable/generated/statsmodels.tsa.arima.model.ARIMA.fit.html);
+el [límite predeterminado del optimizador](https://www.statsmodels.org/stable/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.fit.html)
+era de 50 iteraciones.
+
+En la reproducción del fallo de mayo de 2025, con 137 observaciones de
+entrenamiento, el límite de 50 produjo `converged=False` al alcanzar
+exactamente 50 iteraciones. Al permitir hasta 200, el optimizador
+confirmó convergencia en 50 iteraciones y devolvió los mismos parámetros
+y log-verosimilitud. La corrección consiste en ampliar el límite y
+comprobar el estado devuelto; no se altera manualmente ese estado.
+
+**Convergieron los 13 ajustes SARIMAX**, con entre 25 y 50 iteraciones,
+desde mayo de 2024 hasta mayo de 2025. El guion registra cada origen,
+el tamaño del entrenamiento, el horizonte, las iteraciones y los
+coeficientes exógenos en vehículos por unidad. Antes de pronosticar
+exige convergencia y exógenas finitas; después comprueba que los
+pronósticos sean finitos. Un incumplimiento detiene la ejecución para
+evitar incorporar ese ajuste a las métricas.
+
+El coeficiente del conteo de festivos fue negativo en los 13 orígenes:
+expresado en vehículos, varió entre −2.498,30 y −2.279,09 por festivo.
+En el último origen, mayo de 2025, fue **−2.306,51 vehículos por festivo
+adicional** en la parte de regresión del modelo. Esa asociación
+condicional es compatible con la hipótesis de una menor actividad de
+transporte de carga en meses con más festivos; no demuestra causalidad.
+
+La comparación con los mismos orígenes y horizontes del backtest común
+fue:
+
+| Modelo | RMSE (vehículos) | MAE (vehículos) | MAPE (%) |
+|---|---:|---:|---:|
+| SARIMAX + festivos | 4.137,53 | 3.471,17 | 3,34 |
+| SARIMA | 4.494,34 | 3.747,91 | 3,59 |
+
+**Añadir festivos reduce las tres métricas en este backtest.** Según las
+cifras redondeadas de la tabla, el RMSE baja 356,81 vehículos, el MAE
+276,74 vehículos y el MAPE 0,25 puntos porcentuales. Las métricas
+coinciden con las que se obtenían antes de ampliar el límite, pero ahora
+todos los ajustes que las producen tienen convergencia comprobada.
 
 ## 6. Tabla de métricas
 

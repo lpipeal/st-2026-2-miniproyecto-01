@@ -428,22 +428,51 @@ def exogenas(serie):
 
 
 def modelo_sarimax(orden, orden_estacional, x):
-    """TODO: devuelva modelo(entrenamiento, h) de un SARIMAX con exógenas x.
+    """Devuelve un SARIMAX que se reajusta con las exógenas de cada origen.
 
-    Use x.loc[entrenamiento.index] para ajustar y
-    x.loc[fechas_siguientes(entrenamiento, h)] para pronosticar.
+    Permite hasta 200 iteraciones de L-BFGS y exige convergencia.
+    Usa las fechas de entrenamiento y pronóstico para alinear las exógenas.
     """
+    max_iteraciones = 200
+
     def pronosticar(entrenamiento, h):
+        origen = entrenamiento.index[-1]
         fechas_futuras = fechas_siguientes(entrenamiento, h)
         exog_entrenamiento = x.loc[entrenamiento.index]
         exog_futuras = x.loc[fechas_futuras]
+        if (not np.isfinite(exog_entrenamiento.to_numpy()).all()
+                or not np.isfinite(exog_futuras.to_numpy()).all()):
+            raise ValueError(
+                f"SARIMAX recibió exógenas no finitas en el origen {origen:%Y-%m}."
+            )
         ajuste = ARIMA(
             entrenamiento / ESCALA,
             order=orden,
             seasonal_order=orden_estacional,
             exog=exog_entrenamiento,
-        ).fit()
-        return ajuste.forecast(steps=h, exog=exog_futuras).to_numpy() * ESCALA
+        ).fit(
+            method="statespace",
+            method_kwargs={"method": "lbfgs", "maxiter": max_iteraciones},
+        )
+        if not ajuste.mle_retvals.get("converged", False):
+            raise RuntimeError(
+                f"SARIMAX {orden} x {orden_estacional} no convergió "
+                f"en el origen {origen:%Y-%m}, con un límite de "
+                f"{max_iteraciones} iteraciones."
+            )
+        pronostico = ajuste.forecast(steps=h, exog=exog_futuras).to_numpy() * ESCALA
+        if not np.isfinite(pronostico).all():
+            raise ValueError(
+                f"SARIMAX produjo pronósticos no finitos en el origen {origen:%Y-%m}."
+            )
+        coeficientes_exog = (ajuste.params.loc[x.columns] * ESCALA).round(2).to_dict()
+        print(
+            f"SARIMAX: origen={origen:%Y-%m}; entrenamiento={len(entrenamiento)} "
+            f"meses; horizonte={h}; iteraciones={ajuste.mle_retvals['iterations']}"
+            f"/{max_iteraciones}; convergió=sí; coeficientes exógenos "
+            f"en vehículos por unidad={coeficientes_exog}."
+        )
+        return pronostico
 
     return pronosticar
 # ============================================================
