@@ -98,16 +98,41 @@ temporal debido a la pandemia.
 
 ## 3. Líneas base y backtest
 
-{{Cómo es el backtest: cuántos orígenes, horizonte y qué meses quedan en la
-prueba. Por qué ningún dato posterior al origen entra al modelo.}}
+Se utilizó la función común `backtest`, con los últimos 24 meses como
+periodo de prueba y un horizonte de 12 meses por origen. La prueba abarca
+de junio de 2024 a mayo de 2026. El primer origen es mayo de 2024, con
+125 observaciones de entrenamiento desde enero de 2014; el último es
+mayo de 2025, con 137 observaciones. Entre ambos se evalúan **13 orígenes
+mensuales**, porque cada uno necesita disponer de sus 12 meses futuros
+completos dentro de la muestra.
 
-{{RMSE, MAE y MAPE del ingenuo y del estacional ingenuo, y cuál gana.}}
+La ventana de entrenamiento se amplía un mes en cada origen. La función
+de pronóstico recibe únicamente `serie.iloc[:corte]` y el horizonte;
+las observaciones posteriores al corte se usan para calcular los errores.
+En SARIMA se vuelven a estimar los coeficientes con cada entrenamiento,
+manteniendo los órdenes elegidos previamente. Esta separación describe
+el ajuste en cada origen; la selección de los órdenes se realiza antes
+del backtest.
+
+Los horizontes de evaluación se solapan entre orígenes. Se calculan RMSE,
+MAE y MAPE sobre los 12 pronósticos de cada origen y después se promedia
+cada métrica entre los 13 orígenes, tal como establece `comun.py`.
+
+| Línea base | RMSE (vehículos) | MAE (vehículos) | MAPE (%) |
+|---|---:|---:|---:|
+| Ingenuo | 7.379,41 | 6.353,49 | 6,12 |
+| Estacional ingenuo | 6.833,25 | 5.770,06 | 5,56 |
+
+El ingenuo repite el último valor de entrenamiento para los 12 meses;
+el estacional ingenuo repite los valores del último año observado.
+**El estacional ingenuo gana en las tres métricas** y se usa como la
+línea base de referencia para comparar el SARIMA.
 
 ## 4. Estacionariedad e identificación
 
 Se aplicó la prueba Dickey–Fuller aumentada (ADF) a la serie original y a
 tres transformaciones, con un nivel de significancia del 5 %. La hipótesis
-nula $H_0$ es que es estacionaria; se rechaza cuando el valor p es
+nula $H_0$ es que existe una raíz unitaria; se rechaza cuando el valor p es
 menor que 0,05. No rechazar $H_0$ no demuestra que la raíz exista, pero
 indica que esta prueba no aporta evidencia suficiente para descartarla.
 
@@ -279,8 +304,7 @@ concluir que los residuos sean ruido blanco. La versión anterior omitía
 interpretación del primer contraste.
 
 La figura muestra los residuos estandarizados, su histograma, el gráfico
-Q–Q y su ACF, según la función
-[`plot_diagnostics`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.arima.model.ARIMAResults.plot_diagnostics.html).
+Q–Q y su ACF.
 La serie residual oscila alrededor de cero, pero presenta una desviación
 negativa marcada en 2020 y picos positivos alrededor de 2021. El centro
 del histograma se aproxima a la referencia normal, mientras que las
@@ -294,6 +318,27 @@ su desempeño predictivo, dejando explícita su limitación diagnóstica.
 La elección inicial de $d=1$, $D=0$ y la rejilla pequeña pueden revisarse
 en una ampliación del experimento; un menor AIC no garantiza residuos
 sin autocorrelación.
+
+La función `modelo_sarima` devuelve un pronosticador que conserva los
+órdenes $(0,1,1)(1,0,1)_{12}$, pero ajusta de nuevo los coeficientes en
+cada origen del backtest común. Para el ajuste divide el entrenamiento
+por 10.000; después genera los 12 pronósticos y los multiplica por
+10.000 para devolverlos en vehículos. No entrega valores diferenciados:
+el modelo integrado produce los pronósticos en la escala de la serie
+que recibió para ajustarse.
+
+**Convergieron los 13 ajustes SARIMA**, desde el origen mayo de 2024
+hasta mayo de 2025. El guion imprime cada origen, el tamaño de su
+entrenamiento, el horizonte y la confirmación de convergencia. La función
+detiene la ejecución si un ajuste no converge o si sus pronósticos no
+son finitos, para impedir que ese ajuste aporte métricas sin revisión.
+
+El promedio obtenido en el backtest común fue **RMSE de 4.494,34
+vehículos, MAE de 3.747,91 vehículos y MAPE de 3,59 %**. Las tres medidas
+son menores que las de la mejor línea base, el estacional ingenuo.
+La convergencia confirma que el optimizador terminó según su criterio;
+la autocorrelación residual detectada antes sigue siendo una limitación
+del modelo.
 
 {{La variable exógena: qué es, por qué se conoce de antemano y si mejora al
 SARIMA.}}

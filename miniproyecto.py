@@ -354,14 +354,33 @@ def elegir_sarima(serie, d, D):
 
 
 def modelo_sarima(orden, orden_estacional):
-    """TODO: devuelva la función modelo(entrenamiento, h) del SARIMA elegido."""
+    """Devuelve un SARIMA que se reajusta con cada entrenamiento del backtest.
+
+    Mantiene los órdenes elegidos y entrega h pronósticos en vehículos.
+    Rechaza ajustes sin convergencia o con pronósticos no finitos.
+    """
     def pronosticar(entrenamiento, h):
         ajuste = ARIMA(
             entrenamiento / ESCALA,
             order=orden,
             seasonal_order=orden_estacional,
         ).fit()
-        return ajuste.forecast(steps=h).to_numpy() * ESCALA
+        origen = entrenamiento.index[-1]
+        if not ajuste.mle_retvals.get("converged", False):
+            raise RuntimeError(
+                f"SARIMA {orden} x {orden_estacional} no convergió "
+                f"en el origen {origen:%Y-%m}."
+            )
+        pronostico = ajuste.forecast(steps=h).to_numpy() * ESCALA
+        if not np.isfinite(pronostico).all():
+            raise ValueError(
+                f"SARIMA produjo pronósticos no finitos en el origen {origen:%Y-%m}."
+            )
+        print(
+            f"SARIMA: origen={origen:%Y-%m}; entrenamiento={len(entrenamiento)} "
+            f"meses; horizonte={h}; convergió=sí."
+        )
+        return pronostico
 
     return pronosticar
 
